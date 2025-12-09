@@ -8,14 +8,16 @@ from pymmcore_shutter_sim import SimShutterDevice
 from pymmcore_z_stage_sim import SimZStageDevice
 from pymmcore_plus.experimental.unicore import UniMMCore
 from microscope_sim import MicroscopeSim
-from pymmcore_plus import CMMCorePlus, Keyword
-from pathlib import Path
+#from pymmcore_plus import CMMCorePlus, Keyword
+#from pathlib import Path
 import napari
+from src.microscope_simulation.microscope_sim_optimized import MicroscopeSimOptmized
 
 
 core = UniMMCore()
 
-microscope_simulation = MicroscopeSim()
+#microscope_simulation = MicroscopeSim()
+microscope_simulation = MicroscopeSimOptmized(cell_type="normal", nb_cells=100)
 print(core.getLoadedDevices())
 #-----------------------------------------
 # unload all devices
@@ -67,6 +69,7 @@ core.defineConfig("Real", "membrane-channel", "LED", "Label", "RED")
 core.defineConfig("Real", "membrane-channel", "Filter Wheel", "Label", "miRFP670(642/670)")
 
 core.setConfig("Fake", "nucleus-channel")
+print(core.getFocusDevice())
 
 #print(core.getDeviceInitializationState("LED").__dict__)
 viewer = napari.Viewer()

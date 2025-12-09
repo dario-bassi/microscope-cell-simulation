@@ -7,3 +7,5 @@ napari[pyqt6, optional]
 napari-micromanager
 pymmcore-plus[cli]
 pymmcore-plus[io]
+numba
+opencv

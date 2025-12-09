@@ -1,11 +1,12 @@
 from pymmcore_plus.experimental.unicore import StageDevice
 from microscope_sim import MicroscopeSim
 from pymmcore_plus import FocusDirection
+from src.microscope_simulation.microscope_sim_optimized import MicroscopeSimOptmized
 
 
 class SimZStageDevice(StageDevice):
 
-    def __init__(self, microscope_sim: MicroscopeSim):
+    def __init__(self, microscope_sim: MicroscopeSim | MicroscopeSimOptmized):
 
         super().__init__()
         self._z_current = 0.0
@@ -26,6 +27,9 @@ class SimZStageDevice(StageDevice):
         return
 
     def set_origin(self) -> None:
+        """Set the current position as origin"""
+        # TODO
+        # to change -> see tests
         self._z_current = 0.0
         self._z_old = 0.0
         self.update_z_camera()
@@ -60,9 +64,10 @@ class SimZStageDevice(StageDevice):
         if sign > 0.0 direction towards sample
         if sign < 0.0 direction away from sample
         """
+        pass
         # update z pos
-        new_position = self._z_current + sign
-        self.set_position_um(new_position)
+        #new_position = self._z_current + sign
+        #self.set_position_um(new_position)
 
 
 

@@ -1,15 +1,17 @@
 from pymmcore_plus.experimental.unicore import XYStageDevice
 
 from microscope_sim import MicroscopeSim
+from src.microscope_simulation.microscope_sim_optimized import MicroscopeSimOptmized
 
 
 class SimStageDevice(XYStageDevice):
 
 
-    def __init__(self, microscope_sim: MicroscopeSim | None = None) -> None:
+    def __init__(self, microscope_sim: MicroscopeSim | MicroscopeSimOptmized | None = None) -> None:
         super().__init__()
         self._x = 0.0
         self._y = 0.0
+        self.origin = (0.0,0.0)
         # verify the microscope simulation exists
         if microscope_sim is None:
             raise ValueError("microscope_sim must be provided.")
@@ -50,13 +52,15 @@ class SimStageDevice(XYStageDevice):
         """
         Set the x coordinate of the stage origin
         """
-        self._x = 0.0
+        self.origin = (self._x, self.origin[1])
+        self._x = 0
 
 
     def set_origin_y(self) -> None:
         """
         Set the y coordinate of the stage origin
         """
+        self.origin = (self.origin[0], self._y)
         self._y = 0.0
 
     def update_camera_offset(self) -> None:

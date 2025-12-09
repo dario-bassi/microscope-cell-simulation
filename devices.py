@@ -1,4 +1,5 @@
-from registry import device_registry
+#from registry import device_registry
+from pymmcore_plus.experimental.unicore.devices._register_python_device import device_registry
 from pymmcore_camera_sim import SimCameraDevice
 from pymmcore_shutter_sim import SimShutterDevice
 from pymmcore_stage_sim import SimStageDevice

@@ -1,9 +1,10 @@
 from pymmcore_plus.experimental.unicore import StateDevice
 from microscope_sim import MicroscopeSim
+from src.microscope_simulation.microscope_sim_optimized import MicroscopeSimOptmized
 
 class SimStateDevice(StateDevice):
 
-    def __init__(self, label: str, state_dict: dict[int, str], microscope_sim: MicroscopeSim | None = None) -> None:
+    def __init__(self, label: str, state_dict: dict[int, str], microscope_sim: MicroscopeSim | MicroscopeSimOptmized | None = None) -> None:
         super().__init__(state_dict)
         self._current_state = 0 # default position
         self._current_label = self._state_to_label.get(self._current_state)

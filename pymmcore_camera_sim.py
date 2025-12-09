@@ -13,6 +13,7 @@ import pygame
 from pymmcore_plus.experimental.unicore import pymm_property
 from PIL import ImageEnhance
 from pymmcore_plus import CMMCorePlus
+from src.microscope_simulation.microscope_sim_optimized import MicroscopeSimOptmized
 
 class SimCameraDevice(CameraDevice):
     """
@@ -27,7 +28,7 @@ class SimCameraDevice(CameraDevice):
     _led_channel: str = None
     _filter_wheel_channel: str = None
 
-    def __init__(self, core: UniMMCore | None = None, microscope_sim: MicroscopeSim | None = None) -> None:
+    def __init__(self, core: UniMMCore | None = None, microscope_sim: MicroscopeSim | MicroscopeSimOptmized | None = None) -> None:
         super().__init__()
         if microscope_sim is None:
             raise RuntimeError('microscope_sim must be provided')

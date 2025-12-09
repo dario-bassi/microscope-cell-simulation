@@ -1,0 +1,288 @@
+"""Optimized microscope simulation."""
+import numpy as np
+import time
+from typing import Optional, List, Union
+from src.microscope_simulation.cell_optogenetic import OptogeneticCell
+from src.microscope_simulation.cell_drug import DrugResponseCell
+from src.microscope_simulation.renderer import Renderer
+from src.microscope_simulation.spatial_grid import SpatialGrid
+from src.microscope_simulation.cell_base import CellBase, update_all_cells_parallel, check_collision
+from src.microscope_simulation.cell_normal import NormalCell
+import cv2
+
+
+class MicroscopeSimOptmized:
+    """Optmized microscope simulation with modular cell types."""
+
+    def __init__(self, width: int = 1500, height: int = 1500, 
+                 nb_cells: int = 120, cell_type: str = "optogenetic", 
+                 viewport_width: int = 512, viewport_height: int = 512, 
+                 base_radius: float = 20.0, rng_seed: int = 0,
+                 cell_mix: dict = None):
+        self.width = width
+        self.height = height
+        self.nb_cells = nb_cells
+        self.viewport_width = viewport_width
+        self.viewport_height = viewport_height
+        self.base_radius = base_radius
+        self.cell_type = cell_type
+        self.cell_mix = cell_mix 
+        # Initialize components
+        self.renderer = Renderer(viewport_width, viewport_height)
+        self.spatial_grid = SpatialGrid(width, height, base_radius * 3)
+
+        # Camera settings
+        self.camera_offset = np.array([0.0, 0.0])
+        self.focal_plane = 0.0
+
+        # State tracking ?
+        self.state_devices = {}
+        self.mode = 0
+        self._last_time = time.perf_counter()
+
+        # Initialize cells based on type
+        self._rng = np.random.RandomState(rng_seed)
+
+        # Create cell objects
+        self._cells = self._create_cells()
+        self._init_numpy_arrays()
+
+
+    def _create_cells(self) -> List[Union[OptogeneticCell, DrugResponseCell]]:
+        """Create cells of specific type."""
+        cells = []
+        if self.cell_mix is None:
+
+            for i in range(self.nb_cells):
+                seed = self._rng.randint(0, 10000)
+
+                if self.cell_type == "optogenetic":
+                    cell = OptogeneticCell(self.width, self.height, self.base_radius,vertices=24, seed=seed) # to check
+
+                elif self.cell_type == "drug":
+                    cell = DrugResponseCell(self.width, self.height, self.base_radius, vertices=24, seed=seed) # to check
+                elif self.cell_type == "normal":
+                    cell = NormalCell(self.width, self.height, self.base_radius, vertices = 24, seed= seed)
+                elif self.cell_type == "mixed":
+                    # Default mixed population
+                        cell_choice = self._rng.choice(['normal', 'optogenetic'], p=[0.7, 0.3])
+                        if cell_choice == 'normal':
+                            cell = NormalCell(
+                                self.width, self.height, self.base_radius,
+                                vertices=24, seed=seed
+                            )
+                        else:
+                            cell = OptogeneticCell(
+                                self.width, self.height, self.base_radius,
+                                vertices=24, seed=seed
+                            )
+                else:
+                    raise ValueError(f"Unknow celly type: {self.cell_type}")
+                
+                cells.append(cell)
+        else:
+            # cell_mix = {"normal": 60, "optogenetic": 40, "drug": 20}
+            total = sum(self.cell_mix.values())
+            for cell_type, count in self.cell_mix.items():
+                for _ in range(count):
+                    seed = self._rng.randint(0, 10000)
+                    
+                    if cell_type == "normal":
+                        cell = NormalCell(
+                            self.width, self.height, self.base_radius,
+                            vertices=24, seed=seed
+                        )
+                    elif cell_type == "optogenetic":
+                        cell = OptogeneticCell(
+                            self.width, self.height, self.base_radius,
+                            vertices=24, seed=seed
+                        )
+                    elif cell_type == "drug":
+                        cell = DrugResponseCell(
+                            self.width, self.height, self.base_radius,
+                            vertices=24, seed=seed
+                        )
+                    else:
+                        continue
+                    
+                    cells.append(cell)
+            
+            # Shuffle cells for random positioning
+            self._rng.shuffle(cells)
+            self.nb_cells = len(cells)
+
+        return cells
+    
+    def _init_numpy_arrays(self):
+        """Initialize numpy arrays from cell objects for fast physics."""
+        self.centers = np.zeros((self.nb_cells, 2), dtype=np.float64)
+        self.velocities = np.zeros((self.nb_cells, 2), dtype=np.float64)
+        self.radii = np.zeros((self.nb_cells, 24), dtype=np.float64)
+        self.base_radii = np.zeros(self.nb_cells, dtype=np.float64)
+        self.areas = np.zeros(self.nb_cells, dtype=np.float64)
+        self.angles = np.linspace(0, 2 * np.pi, 24, endpoint=False)
+        
+        # Copy data from cell objects to arrays
+        for i, cell in enumerate(self._cells):
+            self.centers[i] = cell.center
+            self.velocities[i] = cell.vel
+            self.radii[i] = cell.r
+            self.base_radii[i] = cell.base_r
+            self.areas[i] = cell.area0
+
+    def _sync_arrays_to_cells(self):
+        """Sync numpy arrays back to cell objects."""
+        for i, cell in enumerate(self._cells):
+            cell.center = self.centers[i].copy()
+            cell.vel = self.velocities[i].copy()
+            cell.r = self.radii[i].copy()
+    
+
+    def update(self, dt: float = 0.016) -> None:
+        """Update simulation using BOTH fast physics AND cell objects."""
+        # Option 1: Use fast parallel update for physics
+        if self.nb_cells > 20:  # Use parallel for many cells
+            update_all_cells_parallel(
+                self.centers, self.velocities, self.radii, self.angles,
+                self.base_radii, self.areas, self.width, self.height, dt
+            )
+            # Sync back to cell objects
+            self._sync_arrays_to_cells()
+        else:
+            # Option 2: Use individual cell updates for small simulations
+            for cell in self._cells:
+                cell.update_physics(dt)
+            # Sync to arrays
+            self._init_numpy_arrays()
+        
+        # Handle collisions with your SpatialGrid
+        self._handle_collisions_with_spatial_grid()
+
+    def _handle_collisions_with_spatial_grid(self) -> None:
+        """Use SpatialGrid for collision detection."""
+        self.spatial_grid.clear()
+        
+        # Add all cells to spatial grid
+        for i, cell in enumerate(self._cells):
+            self.spatial_grid.add_cell(cell, i)
+        
+        # Check collisions only for nearby cells
+        checked_pairs = set()
+        for i, cell in enumerate(self._cells):
+            potential = self.spatial_grid.get_potential_collisions(cell, i)
+            
+            for j in potential:
+                if (i, j) not in checked_pairs and (j, i) not in checked_pairs:
+                    if cell.check_collision(self._cells[j]):
+                        # Additional collision response for normal cells
+                        if isinstance(cell, NormalCell):
+                            cell.respond_to_collision(self._cells[j])
+                        if isinstance(self._cells[j], NormalCell):
+                            self._cells[j].respond_to_collision(cell)
+                    
+                    checked_pairs.add((i, j))
+
+    def apply_optogenetic_stimulator(self, mask: np.ndarray) -> None:
+        """Apply optogenetic stimulation to cells."""
+        if self.cell_type != "optogenetic":
+            return
+        
+        # Use the actual OptogeneticCell.stimulate() method!
+        for cell in self._cells:
+            if isinstance(cell, OptogeneticCell):
+                cell.stimulate(mask)
+                
+        # Sync changes back to arrays
+        for i, cell in enumerate(self._cells):
+            self.radii[i] = cell.r
+            self.velocities[i] = cell.vel
+
+
+    def apply_drug(self, concentration: float, drug_type: str = "growth") -> None:
+        """Apply drug to all cells"""
+        if self.cell_type != "drug":
+            return
+        
+        for cell in self._cells:
+            if isinstance(cell, DrugResponseCell):
+                cell.apply_drug(concentration, drug_type)
+        
+        # Sync changes back to arrays
+        for i, cell in enumerate(self._cells):
+            self.base_radii[i] = cell.base_r
+            self.radii[i] = cell.r
+            self.areas[i] = cell.area0
+
+    
+    def snap_frame(self, mask: Optional[np.ndarray] = None, intensity: float = 1.0, exposure = 1.0) -> np.ndarray:
+        """Capture a frame with option stimulation"""
+        # Update stimulation
+        now = time.perf_counter()
+        dt = (now - self._last_time) * 0.3 # scale time for smoother simulation
+        self._last_time = now
+        self.update(dt)
+        
+        # Apply optogentic stimulation if mask is provided
+        if mask is not None and self.cell_type == "optogenetic":
+            self.apply_optogenetic_stimulator(mask)
+
+        
+        # determine rendering mode from state devices
+        self._update_mode()
+
+        # Update cell fluorescence based on mode
+        for cell in self._cells:
+            self._update_cell_fluorescence(cell, self.mode)
+
+        # Rebder frame
+        img = self.renderer.render_cells(self._cells, self.mode, tuple(self.camera_offset), self.focal_plane)
+
+        # Apply intensity and exposure
+        img = (img.astype(np.float32) * intensity * exposure).clip(0,255).astype(np.uint8)
+
+        # return grayscale for compatibility
+        return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+
+    def _update_mode(self) -> None:
+        """Update rendering mode base on state devices."""
+        if "Filter Wheel" not in self.state_devices or "LED" not in self.state_devices:
+            self.mode = 0
+            return
+        
+        filter_label = self.state_devices["Filter Wheel"].get("label", "")
+        led_label = self.state_devices["LED"].get("label", "")
+
+        if filter_label == "mScarlet3(569/582)" and led_label == "ORANGE":
+            self.mode = 1 # Nucleus
+        elif filter_label == "miRFP670(642/670)" and led_label == "RED":
+            self.mode = 2 # Membrane
+        else:
+            self.mode = 0 # brightfield
+
+    def _update_cell_fluorescence(self, cell: CellBase, mode: int) -> None:
+        """Update cell fluorescence base on mode"""
+        if mode == 0:
+            cell.nucleus_fluorescence = 0.0
+            cell.membrane_fluorescence[:] = 0.0
+        elif mode == 1:
+            cell.nucleus_fluorescence = 1.0
+            cell.membrane_fluorescence[:] = 0.0
+        elif mode == 2:
+            cell.nucleus_fluorescence = 0.0
+            cell.membrane_fluorescence[:] = 1.0
+
+
+    def get_visible_cells(self) -> List[CellBase]:
+        """Get cells visible in current viewport."""
+        return self.renderer._get_visible_cells(self._cells, tuple(self.camera_offset))
+    
+    def set_focal_plane(self, z: float) -> None:
+        """Set focal plane position."""
+        self.focal_plane = z
+
+    def reset(self) -> None:
+        """Reset simulation."""
+        self._cells = self._create_cells()
+        self._init_numpy_arrays()
+        self._last_time = time.perf_counter()
