@@ -109,8 +109,9 @@ class SimCameraDevice(CameraDevice):
             # convert to array
             #arr = pygame.surfarray.array3d(surf)
             # Convert to grayscale (take one channel)
-            #arr = arr[..., 0].astype(np.uint8)
-            #buf[:] = arr.T  # Transpose to (height, width)
+            # BGR -> RGB
+            #arr = surf[..., 0].astype(np.uint8)
+            #buf[:] = surf.T  # Transpose to (height, width)
             buf[:] = surf
             #print("image before ", buf)
             #buf[:] = self._apply_current_brightness(brightness=self._brightness, current_image=buf) ## apply current values of brightness

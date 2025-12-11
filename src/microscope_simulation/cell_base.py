@@ -40,8 +40,8 @@ def update_cell_physics(center: np.ndarray, vel: np.ndarray, r: np.ndarray,
                          angles: np.ndarray, base_r: float, area0: float,
                          width: float, height: float, dt: float,
                          friction: float = 3.0, brownian_d: float = 80.0,
-                         curvature_relax: float = 0.06, radial_relax: float = 0.02,
-                         ruffle_std: float = 0.06, seed: int = 0) -> tuple:
+                         curvature_relax: float = 0.12, radial_relax: float = 0.08,
+                         ruffle_std: float = 0.01, seed: int = 0) -> tuple:
     """Update cell physics"""
     np.random.seed(seed)
 
@@ -65,7 +65,7 @@ def update_cell_physics(center: np.ndarray, vel: np.ndarray, r: np.ndarray,
     r += curvature_relax * lap + radial_relax * (base_r - r)
 
     # Constrain radius
-    r = np.clip(r, 0.4 * base_r, 2.2 * base_r)
+    r = np.clip(r, 0.7 * base_r, 1.3 * base_r)
 
     # conserve area
     vertices = calculate_vertices(center, angles, r)
@@ -152,8 +152,8 @@ class CellBase:
         # Physics paramters
         self.friction: float = 3.0
         self.brownian_d: float = 80.0
-        self.curvature_relax: float = 0.12
-        self.radial_relax: float = 0.04
+        self.curvature_relax: float = 0.15
+        self.radial_relax: float = 0.10
         self.ruffle_std: float = 0.03
 
         # Fluorescence properties

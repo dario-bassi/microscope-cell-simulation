@@ -1,7 +1,7 @@
 """Optimized microscope simulation."""
 import numpy as np
 import time
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Literal
 from src.microscope_simulation.cell_optogenetic import OptogeneticCell
 from src.microscope_simulation.cell_drug import DrugResponseCell
 from src.microscope_simulation.renderer import Renderer
@@ -18,7 +18,7 @@ class MicroscopeSimOptmized:
                  nb_cells: int = 120, cell_type: str = "optogenetic", 
                  viewport_width: int = 512, viewport_height: int = 512, 
                  base_radius: float = 20.0, rng_seed: int = 0,
-                 cell_mix: dict = None):
+                 cell_mix: dict = None, concentration: float = 0.01, drug_type: Literal["growth", "mobility", "apoptosis"] = "growth"):
         self.width = width
         self.height = height
         self.nb_cells = nb_cells
@@ -26,7 +26,9 @@ class MicroscopeSimOptmized:
         self.viewport_height = viewport_height
         self.base_radius = base_radius
         self.cell_type = cell_type
-        self.cell_mix = cell_mix 
+        self.cell_mix = cell_mix
+        self.concentration = concentration
+        self.drug_type = drug_type 
         # Initialize components
         self.renderer = Renderer(viewport_width, viewport_height)
         self.spatial_grid = SpatialGrid(width, height, base_radius * 3)
@@ -47,8 +49,12 @@ class MicroscopeSimOptmized:
         self._cells = self._create_cells()
         self._init_numpy_arrays()
 
+        # Add zoom property
+        self.zoom = 1.0
+        self.renderer.set_zoom(self.zoom) 
 
-    def _create_cells(self) -> List[Union[OptogeneticCell, DrugResponseCell]]:
+
+    def _create_cells(self) -> List[Union[OptogeneticCell, DrugResponseCell, NormalCell]]:
         """Create cells of specific type."""
         cells = []
         if self.cell_mix is None:
@@ -225,6 +231,8 @@ class MicroscopeSimOptmized:
         # Apply optogentic stimulation if mask is provided
         if mask is not None and self.cell_type == "optogenetic":
             self.apply_optogenetic_stimulator(mask)
+        elif mask is not None and self.cell_type == "drug":
+            self.apply_drug(self.concentration, self.drug_type)
 
         
         # determine rendering mode from state devices
@@ -234,8 +242,11 @@ class MicroscopeSimOptmized:
         for cell in self._cells:
             self._update_cell_fluorescence(cell, self.mode)
 
-        # Rebder frame
-        img = self.renderer.render_cells(self._cells, self.mode, tuple(self.camera_offset), self.focal_plane)
+        # Render frame
+        img = self.renderer.render_cells(
+            self._cells, self.mode, 
+            tuple(self.camera_offset), 
+            self.focal_plane)
 
         # Apply intensity and exposure
         img = (img.astype(np.float32) * intensity * exposure).clip(0,255).astype(np.uint8)
@@ -248,10 +259,11 @@ class MicroscopeSimOptmized:
         """Update rendering mode base on state devices."""
         if "Filter Wheel" not in self.state_devices or "LED" not in self.state_devices:
             self.mode = 0
+            print("no state devices!")
             return
         
-        filter_label = self.state_devices["Filter Wheel"].get("label", "")
-        led_label = self.state_devices["LED"].get("label", "")
+        filter_label = self.state_devices["Filter Wheel"]["label"]#self.state_devices["Filter Wheel"].get("label", "")
+        led_label = self.state_devices["LED"]["label"]#self.state_devices["LED"].get("label", "")
 
         if filter_label == "mScarlet3(569/582)" and led_label == "ORANGE":
             self.mode = 1 # Nucleus
@@ -262,14 +274,16 @@ class MicroscopeSimOptmized:
 
     def _update_cell_fluorescence(self, cell: CellBase, mode: int) -> None:
         """Update cell fluorescence base on mode"""
+        # Reset fluorescence
+        cell.nucleus_fluorescence = 0.0
+        cell.membrane_fluorescence[:] = 0.0
+        
         if mode == 0:
             cell.nucleus_fluorescence = 0.0
             cell.membrane_fluorescence[:] = 0.0
         elif mode == 1:
             cell.nucleus_fluorescence = 1.0
-            cell.membrane_fluorescence[:] = 0.0
         elif mode == 2:
-            cell.nucleus_fluorescence = 0.0
             cell.membrane_fluorescence[:] = 1.0
 
 
@@ -286,3 +300,18 @@ class MicroscopeSimOptmized:
         self._cells = self._create_cells()
         self._init_numpy_arrays()
         self._last_time = time.perf_counter()
+
+    def set_zoom(self, zoom: float) -> None:
+        """Set zoom level."""
+        self.zoom = max(0.1, min(zoom, 200.0))
+        self.renderer.set_zoom(self.zoom)
+
+    def zoom_in(self, factor: float = 10.0) -> None:
+        """Zoom in by factor."""
+        self.set_zoom(self.zoom * factor)
+
+    def zoom_out(self, factor: float = 10.0) -> None:
+        """Zoom out by factor."""
+        self.set_zoom(self.zoom / factor)
+
+    
