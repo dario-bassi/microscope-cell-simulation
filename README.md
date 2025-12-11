@@ -107,30 +107,29 @@ This package is open-source. Please see the LICENSE file. Contributions are welc
 
 
 #### Normal cells simulation
-![Normal cells](/docs/assets/normal_simulation_demo.mp4)
+[Normal cells](/docs/assets/normal_simulation_demo.mp4)
 
 The video shows the simulation of cells that move accordin to Brownian motion and collide with each other. Each cell have a nucleus and a membrane.
 
 #### Optogenetic simulation
-![Opto loop 1](/docs/assets/opto_simulation.mp4)
+[Opto loop 1](/docs/assets/opto_simulation.mp4)
 
 The video shows a simulation of a laser that moves across a stage and the cells interact with the light moving towards the source of light.
 
-![Opto loop](/docs/assets/opto_loop_demo_compressed.mp4)
+[Opto loop](/docs/assets/opto_loop_demo_compressed.mp4)
 
 #### Drug simulation -Enhanced mobility
-![Mobility simulation](/docs/assets/drug_mobility_demo.mp4)
+[Mobility simulation](/docs/assets/drug_mobility_demo.mp4)
 
 The video shows a simulation of cells that have an increase Brownian motion thanks to a drug.
 
 #### Drug simulation - Enhanced cell growth
-![Growth simulation](/docs/assets/drug_growth_demo.mp4)
+[Growth simulation](/docs/assets/drug_growth_demo.mp4)
 
 The video shows a simulation of cells that becomes bigger after given a drug.
 
 #### Drug simulation - Enhanced apoptosis
-![Apoptosis simulation](/docs/assets/drug_apoptosis_demo.mp4)
+[Apoptosis simulation](/docs/assets/drug_apoptosis_demo.mp4)
 
 The video shows a simulation of cells that die, decreasing their size emulating cells behaviour during apoptosis.
-
 ---
