@@ -6,7 +6,7 @@ class DrugResponseCell(CellBase):
     """Cell with drug response capabilities."""
 
     def __init__(self, *args, **kwargs):
-        super().__init__(self, *args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.drug_concentration = 0.0
         self.drug_response_rate = 0.1
         self.max_response = 2.0
@@ -21,7 +21,7 @@ class DrugResponseCell(CellBase):
         elif drug_type == "mobility":
             self._apply_mobility_drug()
         elif drug_type == "apoptosis":
-            self._apply_apoptosis_drud()
+            self._apply_apoptosis_drug()
 
 
     def _apply_growth_drug(self) -> None:

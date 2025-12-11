@@ -146,22 +146,21 @@ class MicroscopeSimOptmized:
 
     def update(self, dt: float = 0.016) -> None:
         """Update simulation using BOTH fast physics AND cell objects."""
-        # Option 1: Use fast parallel update for physics
-        if self.nb_cells > 20:  # Use parallel for many cells
-            update_all_cells_parallel(
-                self.centers, self.velocities, self.radii, self.angles,
-                self.base_radii, self.areas, self.width, self.height, dt
-            )
-            # Sync back to cell objects
-            self._sync_arrays_to_cells()
-        else:
-            # Option 2: Use individual cell updates for small simulations
-            for cell in self._cells:
-                cell.update_physics(dt)
-            # Sync to arrays
-            self._init_numpy_arrays()
-        
-        # Handle collisions with your SpatialGrid
+        # Always use parallel physics
+        update_all_cells_parallel(
+            self.centers, self.velocities, self.radii, self.angles,
+            self.base_radii, self.areas, self.width, self.height, dt
+        )
+
+        # Sync back to cell objects
+        self._sync_arrays_to_cells()
+
+        # Call cell-specific behaviours
+        for cell in self._cells:
+            if hasattr(cell, "update_behavior"):
+                cell.update_behavior(dt)
+
+        # Handle collisions
         self._handle_collisions_with_spatial_grid()
 
     def _handle_collisions_with_spatial_grid(self) -> None:
@@ -232,7 +231,8 @@ class MicroscopeSimOptmized:
         if mask is not None and self.cell_type == "optogenetic":
             self.apply_optogenetic_stimulator(mask)
         elif mask is not None and self.cell_type == "drug":
-            self.apply_drug(self.concentration, self.drug_type)
+            if np.any(mask): # Only if mak has True values
+                self.apply_drug(self.concentration, self.drug_type)
 
         
         # determine rendering mode from state devices
@@ -262,8 +262,8 @@ class MicroscopeSimOptmized:
             print("no state devices!")
             return
         
-        filter_label = self.state_devices["Filter Wheel"]["label"]#self.state_devices["Filter Wheel"].get("label", "")
-        led_label = self.state_devices["LED"]["label"]#self.state_devices["LED"].get("label", "")
+        filter_label = self.state_devices["Filter Wheel"]["label"]
+        led_label = self.state_devices["LED"]["label"]
 
         if filter_label == "mScarlet3(569/582)" and led_label == "ORANGE":
             self.mode = 1 # Nucleus
@@ -274,10 +274,20 @@ class MicroscopeSimOptmized:
 
     def _update_cell_fluorescence(self, cell: CellBase, mode: int) -> None:
         """Update cell fluorescence base on mode"""
-        # Reset fluorescence
-        cell.nucleus_fluorescence = 0.0
-        cell.membrane_fluorescence[:] = 0.0
+        if isinstance(cell, NormalCell):
+            if mode == 0:
+                # Brightfield - no fluorescence visible
+                pass # Keep markes ans skip
+            elif mode == 1:
+                # Shows nucleus only if cell has marker
+                if not cell.has_nucleus_marker:
+                    cell.nucleus_fluorescence = 0.0
+            elif mode == 2:
+                # Show membrane only if cell has marker
+                if not cell.has_membrane_marker:
+                    cell.membrane_fluorescence[:] = 0.0
         
+        # For other types of cell (optogenetic/drug), always show fluorescence
         if mode == 0:
             cell.nucleus_fluorescence = 0.0
             cell.membrane_fluorescence[:] = 0.0

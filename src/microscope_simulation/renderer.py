@@ -45,34 +45,16 @@ class Renderer:
         margin = 100
         vx, vy = camera_offset
 
+        viewport_width = self.width / self.zoom
+        viewport_height = self.height / self.zoom
+
         visible = []
         for cell in cells:
-            if (vx - margin <= cell.center[0] <= vx + self.width + margin and 
-                vy - margin <= cell.center[1] <= vy + self.height + margin):
+            if (vx - margin <= cell.center[0] <= vx + viewport_width + margin and 
+                vy - margin <= cell.center[1] <= vy + viewport_height + margin):
                 visible.append(cell)
         
         return visible
-    
-    #def _smooth_contour(self, pts: np.ndarray, smoothing_factor: int = 3) -> np.ndarray:
-    #    """Smooth cell contour using spline interpolation for more natural appearance."""
-    #    if len(pts) < 4:
-    #        return pts
-            
-        # Close the contour by adding first point at end
-    #    pts_closed = np.vstack([pts, pts[0]])
-        
-        # Use cv2.approxPolyDP for initial smoothing
-    #    epsilon = 0.5  # Adjust for smoothness
-    #    smoothed = cv2.approxPolyDP(pts_closed, epsilon, True)
-        
-        # Further smooth using moving average
-    #    if smoothing_factor > 1:
-    #        kernel = np.ones(smoothing_factor) / smoothing_factor
-    #        smoothed_x = np.convolve(smoothed[:, 0, 0], kernel, mode='same')
-    #        smoothed_y = np.convolve(smoothed[:, 0, 1], kernel, mode='same')
-    #        smoothed = np.column_stack([smoothed_x, smoothed_y]).astype(np.int32)
-        
-    #    return smoothed
     
     def _draw_smooth_cell(self, img: np.ndarray, center: np.ndarray, 
                          vertices: np.ndarray, base_r: float, 
@@ -126,7 +108,7 @@ class Renderer:
         if mode == 0: # brightfield
             # create temporaly image for the cell
             cell_img = np.full((self.height, self.width, 3), 0, dtype=np.uint8)
-            layers = 6
+            layers = 10 #6
 
             for i in range(layers, 0, -1):
                 s = i / layers
@@ -140,27 +122,6 @@ class Renderer:
                 
             self._draw_smooth_cell(cell_img, center_screen, vertices,
                                    cell_radius, (0, 0, 0), thickness=2)
-
-            #base_cytoplasma_color = (190, 190, 190)
-            #self._draw_smooth_cell(cell_img, center_screen, vertices,
-            #                       cell_radius, base_cytoplasma_color, thickness=-1)
-            # Draw body with soft gradient
-            # Draw multiple layers with decreasing intensity
-            #for i in range(10, 0, -1):
-            #    scale = 0.5 + (i / 10.0) * 0.5
-                # darker shade 80-130 instead of 150-200
-            #    shade = int(155 + 30 * (i / 10.0))
-            #    color = (shade, shade, shade)
-
-
-                # Scale vertices smoothly
-            #    scaled_verts = center_screen + (vertices - center_screen) * scale
-                # Draw smooth shape
-            #    self._draw_smooth_cell(cell_img, center_screen, scaled_verts,
-             #                          cell_radius, color, thickness=-1)
-            
-            #self._draw_smooth_cell(cell_img, center_screen, vertices,
-             #                      cell_radius, (135, 135, 135), thickness=1)
             
             # Draw nucleus with (dark center)
             nucleus_pos = tuple(center_screen.astype(int))
@@ -168,20 +129,12 @@ class Renderer:
 
             cv2.circle(cell_img, nucleus_pos, nucleus_radius, (150, 60, 60), -1, lineType=cv2.LINE_AA)
             
-            # Draw multiple circles for gradient effect
-            #for i in range(5, 0, -1):
-            #    radius = int(nucleus_radius * (i / 5.0))
-            #    shade = int(10 + 20 * (i / 5.0)) # darker shade: 20 + 15
-            #    cv2.circle(cell_img, nucleus_pos, radius, (shade, shade, shade),#(shade, shade, shade), 
-            #              -1, lineType=cv2.LINE_AA)
             # Apply blur based on focal plane
-            #if blur_amount > 0:
-            #    cell_img = cv2.GaussianBlur(cell_img,
-            #                                (blur_amount * 2 + 1, blur_amount * 2 + 1),
-            #                                blur_amount / 2.0)
+            if blur_amount > 0:
+                cell_img = cv2.GaussianBlur(cell_img,
+                                            (blur_amount * 2 + 1, blur_amount * 2 + 1),
+                                            blur_amount / 2.0)
                 
-            # Blend with main image using opacity
-            #Amask = (cell_img > 0).astype(np.uint8) * int(opacity * 255)
             cell_opacity = opacity * 1.0
             img[:] = cv2.addWeighted(img, 1.0, cell_img, cell_opacity, 0)
 
@@ -191,15 +144,8 @@ class Renderer:
                 # Create temporary image for fluorescence
                 fluor_img = np.zeros((self.height, self.width, 3), dtype=np.uint8)
 
-                # Draw cell outline
                 nucleus_pos = tuple(center_screen.astype(int))
                 nucleus_radius = int(0.55 * cell_radius)
-
-                #for i in range(3, 0, -1):
-                #    radius = int(nucleus_radius * (1.0 + 0.2 * (3 - i)))
-                #    alpha = 1.0 - (0.3 * (3 - i))
-                #    intensity = int(136 * alpha * cell.nucleus_fluorescence * opacity)
-                #    cv2.circle(fluor_img, nucleus_pos, radius, (intensity, 8, 8), -1, lineType=cv2.LINE_AA)
 
                 # Drawing glowing nucleus with proper color
                 fluorescence_intensity = cell.nucleus_fluorescence * opacity
@@ -217,8 +163,16 @@ class Renderer:
                 cv2.circle(fluor_img, nucleus_pos, int(nucleus_radius * 0.6),
                            (8, 8, 255), -1, lineType=cv2.LINE_AA)
 
-                # Apply blur for glow
-                fluor_img = cv2.GaussianBlur(fluor_img, (21,21), 7)
+                base_blur = 21
+                if blur_amount > 0:
+                    # Add extra blur for out of ocus
+                    total_blur = base_blur + (blur_amount * 2)
+                    total_blur = total_blur if total_blur % 2 == 1 else total_blur + 1
+                    fluor_img = cv2. GaussianBlur(fluor_img, (total_blur, total_blur),
+                                                  blur_amount * 0.8)
+                else:
+                    # Apply blur for glow
+                    fluor_img = cv2.GaussianBlur(fluor_img, (base_blur,base_blur), 7)
 
                 # Blend with main image
                 img[:] = cv2.add(img, fluor_img)
@@ -230,29 +184,22 @@ class Renderer:
                 fluor_img = np.zeros((self.height, self.width, 3), dtype=np.uint8)
                 avg_fluorescence = np.mean(cell.membrane_fluorescence) * opacity
 
-                membrane_color = (int(136 * avg_fluorescence), int(8 * avg_fluorescence), int(8 * avg_fluorescence))
+                membrane_color = (int(8 * avg_fluorescence), 
+                                  int(8 * avg_fluorescence), 
+                                  int(255 * avg_fluorescence)) # old 136 8 8
 
                 self._draw_smooth_cell(fluor_img, center_screen, vertices, cell_radius, membrane_color, thickness=-1)
 
-                #base_color = (int(30 * avg_fluorescence), 0, int(15 * avg_fluorescence))
-                #self._draw_smooth_cell(fluor_img, center_screen, vertices, 
-                #                       cell_radius, base_color, thickness=-1)
-
-                # Draw membrane with proper thickness
-                # Outer glow
-                #glow_verts = center_screen + (vertices - center_screen) * 1.1
-                #glow_color = (int(80 * avg_fluorescence), 0, int(40 * avg_fluorescence)) # Cyan
-                #self._draw_smooth_cell(fluor_img, center_screen, glow_verts, 
-                #                                 cell_radius * 1.1, glow_color, thickness=-1)
-                
-                # Main membrane
-                #outer_verts = center_screen + (vertices - center_screen) * 1.05
-                #membrane_color = (int(255 * avg_fluorescence), 0, int(150 * avg_fluorescence))
-                #self._draw_smooth_cell(fluor_img, center_screen, outer_verts, 
-                #                                     cell_radius * 1.05,membrane_color, thickness=-1)
-                
-                # Apply blur effect for glow
-                fluor_img = cv2.GaussianBlur(fluor_img, (7, 7), 2)
+                base_blur = 7
+                if blur_amount > 0:
+                    # Add extra blur for out-of-focus
+                    total_blur = base_blur + (base_blur * 2)
+                    total_blur = total_blur if total_blur % 2 == 1 else total_blur + 1
+                    fluor_img = cv2.GaussianBlur(fluor_img, (total_blur, total_blur),
+                                                 blur_amount * 0.6)
+                else:
+                    # Apply blur effect for glow
+                    fluor_img = cv2.GaussianBlur(fluor_img, (7, 7), 2)
 
                 # Blend with main image
                 img[:] = cv2.add(img, fluor_img)
@@ -266,13 +213,6 @@ class Renderer:
             img = img.astype(np.float32)
             img = (img - 128.0) * self.contrast + 128.0
             img = np.clip(img, 0, 255).astype(np.uint8)
-
-            # Apply slight constrast adjustment
-            #img = cv2.convertScaleAbs(img, alpha=self.contrast, beta=(self.brightness * 255) - 128)
-
-            # Add subtle texture\noise like in real microscope
-            #noise = np.random.normal(0, 3, img.shape).astype(np.int16)
-            #img = np.clip(img.astype(np.int16) + noise, 0, 255).astype(np.uint8)
 
             # Final blur realistic appeareance
             kernel_size = 2 * self.blur_radius + 1
@@ -288,16 +228,7 @@ class Renderer:
 
             # Convert back to BGR for consticency
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR) # RGB
-
-
         else: # Fluorescence mode
-            # Enhance constrast for fluorescence
-            #img = cv2.convertScaleAbs(img, alpha=self.contrast, beta=(self.brightness * 255) - 128)
-            #img = img.astype(np.float32)
-            #img = (img - 128.0) * self.contrast + 128.0
-            #img = img * self.brightness
-            #img = np.clip(img, 0, 255).astype(np.uint8)
-
             # Slight blur for realistic fluorescence (to check!)
             kernel_size = 2 * self.blur_radius + 1
             img = cv2.GaussianBlur(img, (kernel_size, kernel_size), 1.0)
@@ -306,10 +237,5 @@ class Renderer:
         return img
     
     def set_zoom(self, zoom: float) -> None:
-        """
-        Set zoom level.
-        zoom = 1.0 -> normal
-        zoom >= 1.0 -> zoom in
-        zoom < 1.0 -> zoom out
-        """
+        """Set zoom level."""
         self.zoom = max(0.1, min(zoom, 200.0))

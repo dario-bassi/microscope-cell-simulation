@@ -1,0 +1,34 @@
+# animation_drug_growth.py
+import numpy as np
+import cv2
+from src.microscope_simulation.microscope_sim_optimized import MicroscopeSimOptmized
+
+FIELD_SIZE = 512
+N_FRAMES = 180
+fps = 20
+video_filename = "drug_growth_demo.mp4"
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+out = cv2.VideoWriter(video_filename, fourcc, fps, (FIELD_SIZE, FIELD_SIZE))
+
+sim = MicroscopeSimOptmized(width=FIELD_SIZE, height=FIELD_SIZE, nb_cells=30, cell_type='drug')
+
+# Drug mask covers the whole field
+mask = np.ones((FIELD_SIZE, FIELD_SIZE), dtype=bool)
+
+for t in range(N_FRAMES):
+    # Set type and concentration each frame (optional, for clarity)
+    sim.drug_type = "growth"
+    sim.concentration = 0.05
+    frame = sim.snap_frame(mask=mask)
+
+    frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+    # Overlay green for clarity
+    overlay = np.zeros_like(frame)
+    overlay[mask] = (0,255,0)
+    frame_strip = cv2.addWeighted(frame, 1.0, overlay, 0.12, 0)
+
+    out.write(frame_strip)
+    print(f"Frame {t+1}/{N_FRAMES}")
+
+out.release()
+print(f"Video saved as {video_filename}")
