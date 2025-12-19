@@ -50,8 +50,11 @@ class MicroscopeSimOptmized:
         self._init_numpy_arrays()
 
         # Add zoom property
-        self.zoom = 1.0
-        self.renderer.set_zoom(self.zoom) 
+        #self.zoom = 1.0
+        #self.renderer.set_zoom(self.zoom)
+
+        # Add objective property
+        self.current_objectiv: int = 10 
 
 
     def _create_cells(self) -> List[Union[OptogeneticCell, DrugResponseCell, NormalCell]]:
@@ -311,17 +314,35 @@ class MicroscopeSimOptmized:
         self._init_numpy_arrays()
         self._last_time = time.perf_counter()
 
-    def set_zoom(self, zoom: float) -> None:
-        """Set zoom level."""
-        self.zoom = max(0.1, min(zoom, 200.0))
-        self.renderer.set_zoom(self.zoom)
+    #def set_zoom(self, zoom: float) -> None:
+    #    """Set zoom level."""
+    #    self.zoom = max(0.1, min(zoom, 200.0))
+    #    self.renderer.set_zoom(self.zoom)
 
-    def zoom_in(self, factor: float = 10.0) -> None:
-        """Zoom in by factor."""
-        self.set_zoom(self.zoom * factor)
+    #def zoom_in(self, factor: float = 10.0) -> None:
+    #    """Zoom in by factor."""
+    #    self.set_zoom(self.zoom * factor)
 
-    def zoom_out(self, factor: float = 10.0) -> None:
-        """Zoom out by factor."""
-        self.set_zoom(self.zoom / factor)
+    #def zoom_out(self, factor: float = 10.0) -> None:
+    #    """Zoom out by factor."""
+    #    self.set_zoom(self.zoom / factor)
 
-    
+
+    def set_objective(self, mag: int) -> None:
+        """
+        Set the objective of the camera. Allowed values are 10x, 20x and 40x
+        """
+        if mag not in (10, 20, 40):
+            raise ValueError("Objective must be 10, 20, 40")
+        self.current_objectiv = mag
+
+        # Update rendered object
+        # dof -> depth of field
+        if mag == 10: # 10x
+            dof = 6.0
+        elif mag == 20: # 20x
+            dof = 4.0
+        else: # 40x
+            dof = 1.5
+
+        self.renderer.set_objective(self.current_objectiv, dof)
