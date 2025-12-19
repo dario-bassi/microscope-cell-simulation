@@ -9,3 +9,4 @@ pymmcore-plus[cli]
 pymmcore-plus[io]
 numba
 opencv
+pre-commit

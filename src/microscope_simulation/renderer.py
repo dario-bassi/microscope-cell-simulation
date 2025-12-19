@@ -14,7 +14,6 @@ class Renderer:
         self.contrast = 0.55
         self.brightness = 0.78
         self.blur_radius = 3 # blur kernel size
-        #self.zoom = 1.0 # TODO check if useful
         self.noise_std = 10 # some noise
         self.margins = 100
 
@@ -57,8 +56,8 @@ class Renderer:
         margin = self.margins
         vx, vy = camera_offset
 
-        viewport_width = self.width # always leave viewport dimension to 512 #(/ self.zoom)
-        viewport_height = self.height # always leave viewport dimension to 512 #(/ self.zoom)
+        viewport_width = self.width # always leave viewport dimension to 512 
+        viewport_height = self.height # always leave viewport dimension to 512
 
         visible = []
         for cell in cells:
@@ -98,13 +97,6 @@ class Renderer:
     def _draw_cell(self, img: np.ndarray, cell: CellBase, mode: int, 
                    camera_offset: Tuple[float, float], focal_plane: float) -> None:
         """Draw a single cell using OpenCV with proper focal plane effect."""
-        # Calculate focus effects based on z-distance from focal plane
-        #z_distance = abs(cell.z_position - focal_plane)
-        # blur amoun increases with distance from focal plane
-        #blur_amount = int(min(10, z_distance / 10.0))
-        # opacity decreases with distance
-        #opacity = max(0.3, 1.0 - z_distance / 100.0)
-
         # compute blur and opacity using depth of field and z-distance
         kernel_size, opacity = self._compute_blur_and_opacity(cell.z_position, focal_plane)
 
@@ -254,11 +246,8 @@ class Renderer:
     
     def set_objective(self, mag: int, dof: float) -> None:
         """Set the current objective and its depth of field"""
-        #if mag not in (10, 20, 40):
-        #    raise ValueError("Objective must be 10, 20 or 40") # probably not useful this exception
-        
-        self.objective = mag
-        self.dof = dof
+        self.objective = mag # set magnitude objective
+        self.dof = dof # set depth of field
 
 
     def _compute_blur_and_opacity(self, cell_z: float, focal_plane: float) -> Tuple[int, float]:
@@ -269,6 +258,7 @@ class Renderer:
         Returns (kernel_size, opacity) where kernel_size is 0 for no blur.
 
         """
+        # Calculate focus effects based on z-distance from focal plane
         # z positions from focal plane
         z_dist_um = abs(cell_z - focal_plane)
 
@@ -279,6 +269,7 @@ class Renderer:
         # Out of focus amount
         out_um = z_dist_um - self.dof
 
+        # blur amoun increases with distance from focal plane
         # Map out_um to blur radius (pixel radius)
         # Tunable mapping: gentle growth near DOF, faster for larger distances
         # normalized by DOF to be objective-aware
@@ -291,7 +282,7 @@ class Renderer:
         else:
             kernel = 0
 
-        # Opacity falloff (fades with distance)
+        # opacity decreases with distance
         opacity = max(self.min_opacity, 1.0 / (1.0 + 0.12 * (out_um / max(1.0, self.dof))))
 
         return kernel, float(opacity)
@@ -315,14 +306,16 @@ class Renderer:
             self.crop_dim = 512 * (10 / self.objective)
 
         # Compute coordinates of top left vertice of the image
-        x_start = (self.width - self.crop_dim) / 2
-        y_start = (self.height - self.crop_dim) / 2
+        x_start = int((self.width - self.crop_dim) / 2)
+        y_start = int((self.height - self.crop_dim) / 2)
 
+        
         # slice new image
-        crop_img = img[x_start:-x_start, y_start:y_start]
+        crop_img = img[x_start:-x_start, y_start:-y_start]
+
 
         # rescale the image to have same dimensions of width and height
-        rescaled_img = cv2.resize(crop_img, (self.width, self.height))
+        rescaled_img = cv2.resize(crop_img, (self.width, self.height), interpolation=cv2.INTER_CUBIC)
 
         return rescaled_img
 

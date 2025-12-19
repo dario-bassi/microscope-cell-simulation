@@ -41,6 +41,7 @@ class MicroscopeSimOptmized:
         self.state_devices = {}
         self.mode = 0
         self._last_time = time.perf_counter()
+        self._objectif_dict = {"10x":10, "20x":20, "40x": 40}
 
         # Initialize cells based on type
         self._rng = np.random.RandomState(rng_seed)
@@ -48,10 +49,6 @@ class MicroscopeSimOptmized:
         # Create cell objects
         self._cells = self._create_cells()
         self._init_numpy_arrays()
-
-        # Add zoom property
-        #self.zoom = 1.0
-        #self.renderer.set_zoom(self.zoom)
 
         # Add objective property
         self.current_objectiv: int = 10 
@@ -241,6 +238,9 @@ class MicroscopeSimOptmized:
         # determine rendering mode from state devices
         self._update_mode()
 
+        # determine objective render from state devices
+        self._update_objectif()
+
         # Update cell fluorescence based on mode
         for cell in self._cells:
             self._update_cell_fluorescence(cell, self.mode)
@@ -262,8 +262,7 @@ class MicroscopeSimOptmized:
         """Update rendering mode base on state devices."""
         if "Filter Wheel" not in self.state_devices or "LED" not in self.state_devices:
             self.mode = 0
-            print("no state devices!")
-            return
+            raise ValueError("no state devices for Filter Wheel and LED!")
         
         filter_label = self.state_devices["Filter Wheel"]["label"]
         led_label = self.state_devices["LED"]["label"]
@@ -274,6 +273,30 @@ class MicroscopeSimOptmized:
             self.mode = 2 # Membrane
         else:
             self.mode = 0 # brightfield
+
+    def _update_objectif(self) -> None:
+        """Update the objctiv used based on the state device."""
+        if "Objective" not in self.state_devices:
+            raise ValueError("no state device for the objectif!")
+        
+        objectif_label = self.state_devices["Objective"]["label"]
+
+        if objectif_label not in ("10x", "20x", "40x"):
+            raise ValueError("Objective must be 10x, 20x, 40x")
+
+        self.current_objectiv = self._objectif_dict[objectif_label]
+
+        # Update rendered object
+        # dof -> depth of field
+        if self.current_objectiv == 10: # 10x
+            dof = 6.0
+        elif self.current_objectiv == 20: # 20x
+            dof = 4.0
+        else: # 40x
+            dof = 1.5
+
+        self.renderer.set_objective(self.current_objectiv, dof)
+            
 
     def _update_cell_fluorescence(self, cell: CellBase, mode: int) -> None:
         """Update cell fluorescence base on mode"""
@@ -313,36 +336,3 @@ class MicroscopeSimOptmized:
         self._cells = self._create_cells()
         self._init_numpy_arrays()
         self._last_time = time.perf_counter()
-
-    #def set_zoom(self, zoom: float) -> None:
-    #    """Set zoom level."""
-    #    self.zoom = max(0.1, min(zoom, 200.0))
-    #    self.renderer.set_zoom(self.zoom)
-
-    #def zoom_in(self, factor: float = 10.0) -> None:
-    #    """Zoom in by factor."""
-    #    self.set_zoom(self.zoom * factor)
-
-    #def zoom_out(self, factor: float = 10.0) -> None:
-    #    """Zoom out by factor."""
-    #    self.set_zoom(self.zoom / factor)
-
-
-    def set_objective(self, mag: int) -> None:
-        """
-        Set the objective of the camera. Allowed values are 10x, 20x and 40x
-        """
-        if mag not in (10, 20, 40):
-            raise ValueError("Objective must be 10, 20, 40")
-        self.current_objectiv = mag
-
-        # Update rendered object
-        # dof -> depth of field
-        if mag == 10: # 10x
-            dof = 6.0
-        elif mag == 20: # 20x
-            dof = 4.0
-        else: # 40x
-            dof = 1.5
-
-        self.renderer.set_objective(self.current_objectiv, dof)
