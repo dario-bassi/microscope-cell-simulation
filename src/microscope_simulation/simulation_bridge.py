@@ -13,6 +13,9 @@ class SimulationBridge:
     modifing the pyDevice.
     """
     def __init__(self, microscope_sim : MicroscopeSimOptmized) -> None:
+
+        if microscope_sim is None:
+            raise ValueError("The microscope simulation must be initialized.")
         self._sim = microscope_sim
 
     
@@ -27,7 +30,3 @@ class SimulationBridge:
 
     def set_state(self, dict_state: dict) -> None:
         self._sim.state_devices.update(dict_state)
-
-    def set_objective(self, idx):
-        mag = {0: 10, 1: 20, 2: 40}
-        # ADD part of the objective
