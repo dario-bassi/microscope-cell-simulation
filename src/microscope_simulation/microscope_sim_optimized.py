@@ -263,7 +263,6 @@ class MicroscopeSimOptmized:
         if "Filter Wheel" not in self.state_devices or "LED" not in self.state_devices:
             self.mode = 0
             raise ValueError("no state devices for Filter Wheel and LED!")
-        
         filter_label = self.state_devices["Filter Wheel"]["label"]
         led_label = self.state_devices["LED"]["label"]
 
