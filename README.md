@@ -1,5 +1,5 @@
 
-# Opto-Loop-Sim ![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)
+# Virtual simulation ![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)
 
 ## 🧬 What is Opto-Loop-Sim?
 Opto-Loop-Sim is a highly modular and efficient simulation framework for virtual microscopy experiments and optical feedback loops. It is designed to facilitate the prototyping, testing, and validation of advanced microscope control—including optogenetic experiments and drug-response assays—without physical hardware.
